@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+[project]
+authors = [
+	{name = "Benoît GSCHWIND", email = "benoit.gschwind@minesparis.psl.eu"},
+	{name = "OIE - Mines Paris PSL", email = "benoit.gschwind@minesparis.psl.eu"},
+]
+maintainers = [
+	{name = "Benoît GSCHWIND", email = "benoit.gschwind@minesparis.psl.eu"},
+]
+name = "brightway-basic-explorer"
+description = "Implement basic GUI to explorer brightway ativities"
+readme = "README.md"
+license-files = ["COPYING"]
+version = "0.9.dev0"
+dependencies = [ "PyQt6" ]
+requires-python = ">= 3.10"
+keywords = ["lca", "ecoinvent", "brightway"]
+classifiers = [
+	"Programming Language :: Python :: 3.10",
+	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3.12",
+	"Programming Language :: Python :: 3.13",
+]
+[project.urls]
+Homepage = "https://github.com/gschwind/brightway-basic-explorer"
+Repository = "https://github.com/gschwind/brightway-basic-explorer"
+Documentation = "https://github.com/gschwind/brightway-basic-explorer"
+Issues = "https://github.com/gschwind/brightway-basic-explorer/issues"
+[tool.setuptools]
+packages = ["brightway_basic_explorer"]

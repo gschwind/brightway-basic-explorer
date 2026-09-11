@@ -1,0 +1,172 @@
+# coding=utf-8
+
+from IPython.external.qt_for_kernel import QtGui, QtCore
+from IPython.lib.guisupport import start_event_loop_qt4, get_app_qt4, is_event_loop_running_qt4
+
+import matplotlib
+import bw2data
+
+def activity_to_json(act):
+    a = dict(act)
+    exs = list()
+    for e in act.exchanges():
+        de = dict(bw2data.get_activity(e["input"]))
+        de["amount"] = e["amount"]
+        de["formula"] = e.get("formula", None)
+        exs.append(de)
+    a["exchanges"] = exs
+    return a
+
+class QStandardItemRO(QtGui.QStandardItem):
+    def __init__(self, *args, data=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setEditable(False)
+        self.setSelectable(True)
+        self.setData(data)
+
+
+class TableModel(QtGui.QStandardItemModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setColumnCount(6)
+        self.setHeaderData(0, QtCore.Qt.Orientation.Horizontal, "Name")
+        self.setHeaderData(1, QtCore.Qt.Orientation.Horizontal, "Unit")
+        self.setHeaderData(2, QtCore.Qt.Orientation.Horizontal, "Category")
+        self.setHeaderData(3, QtCore.Qt.Orientation.Horizontal, "Location")
+        self.setHeaderData(4, QtCore.Qt.Orientation.Horizontal, "Amount")
+        self.setHeaderData(5, QtCore.Qt.Orientation.Horizontal, "Formula")
+
+    def load(self, data):
+        self.exchanges = [e for e in data]
+        self.root = self.invisibleRootItem()
+        for e in data:
+            self.root.appendRow([
+                QStandardItemRO(str(e.get(k, "-")), data=e)
+                for k in ["name", "unit", "categories", "location", "amount", "formula"]
+            ])
+
+class ActionMenu(QtGui.QMenu):
+    def __init__(self, parent, index):
+        super().__init__(parent)
+        self.index = index
+
+        self.action_copy = self.addAction("Copy")
+        self.action_copy.triggered.connect(self.copy_triggered)
+
+        self.action_explore = self.addAction("Explore")
+        self.action_explore.triggered.connect(self.explore_triggered)
+
+    def copy_triggered(self):
+        QtGui.QGuiApplication.clipboard().setText(self.index.data())
+
+    def explore_triggered(self):
+        self.parentWidget().explore(self.index)
+
+
+class ActivityWindow(QtGui.QMainWindow):
+    keep = dict()
+
+    def __init__(self, act):
+        super().__init__()
+        self.act = act
+
+        data = activity_to_json(act)
+
+        self.setWindowTitle("Activity Viewer")
+        self.setGeometry(100, 100, 800, 600)
+
+        # Create central widget and layout
+        central_widget = QtGui.QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QtGui.QVBoxLayout()
+        central_widget.setLayout(layout)
+
+        grid = QtGui.QGridLayout()
+        layout.addLayout(grid)
+
+        for i, k in enumerate(["database", "name", "location", "unit", "categories"]):
+            grid.addWidget(QtGui.QLabel(f"{k}:"), i, 0)
+            x = QtGui.QLabel(f"{str(data.get(k, '-'))}")
+            x.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+            grid.addWidget(x, i, 1)
+        grid.addWidget(QtGui.QLabel("filter:"), 5, 0)
+        self.filter_edit = QtGui.QLineEdit("")
+        self.filter_edit.textChanged.connect(self.update_filter)
+        grid.addWidget(self.filter_edit, 5, 1)
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 1)
+        self.ignore_case = QtGui.QCheckBox("Ignore Case")
+        self.ignore_case.setChecked(True)
+        if hasattr(self.ignore_case, "checkStateChanged"):
+            self.ignore_case.checkStateChanged.connect(self.update_filter)
+        else:
+            self.ignore_case.stateChanged.connect(self.update_filter)
+        grid.addWidget(self.ignore_case, 6, 1)
+        # Create tree view
+        self.tree_view = QtGui.QTreeView()
+        layout.addWidget(self.tree_view)
+        self.tree_view.setSortingEnabled(True)
+        self.tree_view.setAlternatingRowColors(True)
+
+        self.model = TableModel()
+        self.model.load(data["exchanges"])
+        self.tree_view.setModel(self.model)
+        self.tree_view.doubleClicked.connect(self.doubleCliked)
+        self.tree_view.setExpandsOnDoubleClick(False)
+        self.tree_view.setSelectionBehavior(QtGui.QAbstractItemView.SelectionBehavior.SelectItems)
+        #self.tree_view.rightClick.connect(self.rightClick)
+        self.tree_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(self.context_menu)
+
+    def context_menu(self, point):
+        index = self.tree_view.indexAt(point)
+        self.action_menu = ActionMenu(self, index)
+        self.action_menu.exec(self.tree_view.viewport().mapToGlobal(point))
+
+    def closeEvent(self, ev):
+        #del ActivityWindow.keep[self.act]
+        super().closeEvent(ev)
+
+    def update_filter(self, *args):
+        text = self.filter_edit.text()
+        if self.ignore_case.isChecked():
+            text = text.lower()
+            index = self.model.root.index()
+            for i in range(self.model.rowCount()):
+                v = self.model.root.child(i, 0).data()
+                self.tree_view.setRowHidden(i, index, text not in v["name"].lower())
+        else:
+            index = self.model.root.index()
+            for i in range(self.model.rowCount()):
+                v = self.model.root.child(i, 0).data()
+                self.tree_view.setRowHidden(i, index, text not in v["name"])
+
+    def doubleCliked(self, index):
+        self.explore(index)
+
+    def explore(self, index):
+        r = index.row()
+        v = self.model.root.child(r, 0).data()
+        show_activity(bw2data.get_activity((v["database"], v["code"])))
+
+    def show(self, *args, **kwargs):
+        super().show(*args, **kwargs)
+        self.tree_view.setColumnWidth(0, 400)
+
+def show_activity(act):
+    if 'module://matplotlib_inline.backend_inline' == matplotlib.backends.backend:
+        print("WARNING: ActivityGUI will block, use `%matplotlib qt` to avoid blocking")
+    if matplotlib.backends.backend != "qtagg":
+        print(f"unexpected backend {matplotlib.backends.backend}")
+    app = get_app_qt4()
+
+    if (window := ActivityWindow.keep.get(act.key, None)) is None:
+        window = ActivityWindow(act)
+        ActivityWindow.keep[act.key] = window
+    window.show()
+
+    if not is_event_loop_running_qt4(app):
+        start_event_loop_qt4(app)
+
+
+
