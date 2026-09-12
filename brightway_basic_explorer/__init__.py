@@ -107,15 +107,16 @@ class ActivityWindow(QtGui.QMainWindow):
         grid = QtGui.QGridLayout()
         layout.addLayout(grid)
 
-        for i, k in enumerate(["database", "name", "location", "unit", "categories"]):
+        for i, k in enumerate(["database", "name", "location", "unit", "categories", "type"]):
             grid.addWidget(QtGui.QLabel(f"{k}:"), i, 0)
             x = QtGui.QLabel(f"{str(data.get(k, '-'))}")
             x.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
             grid.addWidget(x, i, 1)
-        grid.addWidget(QtGui.QLabel("filter:"), 5, 0)
+        next_row = grid.rowCount()
+        grid.addWidget(QtGui.QLabel("filter:"), next_row, 0)
         self.filter_edit = QtGui.QLineEdit("")
         self.filter_edit.textChanged.connect(self.update_filter)
-        grid.addWidget(self.filter_edit, 5, 1)
+        grid.addWidget(self.filter_edit, next_row, 1)
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 1)
         self.ignore_case = QtGui.QCheckBox("Ignore Case")
@@ -124,7 +125,8 @@ class ActivityWindow(QtGui.QMainWindow):
             self.ignore_case.checkStateChanged.connect(self.update_filter)
         else:
             self.ignore_case.stateChanged.connect(self.update_filter)
-        grid.addWidget(self.ignore_case, 6, 1)
+        next_row = grid.rowCount()
+        grid.addWidget(self.ignore_case, next_row, 1)
         # Create tree view
         self.tree_view = QtGui.QTreeView()
         layout.addWidget(self.tree_view)
