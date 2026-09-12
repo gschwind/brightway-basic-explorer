@@ -133,7 +133,8 @@ class ActivityWindow(QtGui.QMainWindow):
         self.action_menu.exec(self.tree_view.viewport().mapToGlobal(point))
 
     def closeEvent(self, ev):
-        #del ActivityWindow.keep[self.act]
+        if self.act.key in ActivityWindow.keep:
+            del ActivityWindow.keep[self.act.key]
         super().closeEvent(ev)
 
     def update_filter(self, *args):
