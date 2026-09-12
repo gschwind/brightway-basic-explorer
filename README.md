@@ -6,7 +6,7 @@ Implement a basic activity explorer mostly to use in interractive python such as
 
 ```python
 import bw2data
-from brightway_basic_explorer import show_activity
+from brightway_basic_explorer import show_activity, close_all
 
 db = bw2data.Database("ecoinvent-3.11-cutoff")
 
@@ -14,4 +14,7 @@ act = db.search("570kWp")
 
 # Show the first activity
 show_activity(act[0])
+
+# Close all activity windows
+close_all()
 ```
