@@ -178,5 +178,6 @@ def show_activity(act):
     if not is_event_loop_running_qt4(app):
         start_event_loop_qt4(app)
 
-
-
+def close_all():
+    for w in list(ActivityWindow.keep.values()):
+        w.close()
