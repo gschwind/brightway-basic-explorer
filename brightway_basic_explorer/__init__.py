@@ -3,6 +3,7 @@
 from IPython.external.qt_for_kernel import QtGui, QtCore
 from IPython.lib.guisupport import start_event_loop_qt4, get_app_qt4, is_event_loop_running_qt4
 
+import os
 import matplotlib
 import bw2data
 
@@ -40,10 +41,23 @@ class TableModel(QtGui.QStandardItemModel):
         self.exchanges = [e for e in data]
         self.root = self.invisibleRootItem()
         for e in data:
-            self.root.appendRow([
+            row = [
                 QStandardItemRO(str(e.get(k, "-")), data=e)
                 for k in ["name", "unit", "categories", "location", "amount", "formula"]
-            ])
+            ]
+
+            etype = e.get("type", "unknown")
+            if etype == "emission":
+                path = os.path.join(os.path.dirname(__file__), "icons", "emission.png")
+            elif etype == "process":
+                path = os.path.join(os.path.dirname(__file__), "icons", "process.png")
+            elif etype == "natural resource":
+                path = os.path.join(os.path.dirname(__file__), "icons", "natural_resource.png")
+            else:
+                path = os.path.join(os.path.dirname(__file__), "icons", "unknown.png")
+
+            row[0].setIcon(QtGui.QIcon(path))
+            self.root.appendRow(row)
 
 class ActionMenu(QtGui.QMenu):
     def __init__(self, parent, index):

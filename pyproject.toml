@@ -28,4 +28,6 @@ Repository = "https://github.com/gschwind/brightway-basic-explorer"
 Documentation = "https://github.com/gschwind/brightway-basic-explorer"
 Issues = "https://github.com/gschwind/brightway-basic-explorer/issues"
 [tool.setuptools]
-packages = ["brightway_basic_explorer"]
+packages = ["brightway_basic_explorer", "brightway_basic_explorer.icons"]
+[tool.setuptools.package-data]
+"brightway_basic_explorer.icons" = ["*.png"]
