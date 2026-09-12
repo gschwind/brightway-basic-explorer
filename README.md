@@ -2,6 +2,14 @@
 
 Implement a basic activity explorer mostly to use in interractive python such as notebooks, ipython and spyder.
 
+# Install
+
+```
+pip install brightway_basic_explorer
+```
+
+# Sample and Documentation
+
 ![Sample Window](https://github.com/gschwind/brightway-basic-explorer/raw/main/doc/sample-window.png)
 
 ```python
