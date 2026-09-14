@@ -18,6 +18,37 @@ def activity_to_json(act):
     a["exchanges"] = exs
     return a
 
+def activity_to_json_with_params(act, params):
+    try:
+        from lca_algebraic.params import (
+            all_params,
+            _complete_and_expand_params,
+            _getAmountOrFormula,
+        )
+
+        from sympy import Basic, Symbol
+    except:
+        raise Exception("lca_algebraic not found, please install it before using show_activity_with_params")
+
+    a = dict(act)
+    exs = list()
+    for e in act.exchanges():
+        de = dict(bw2data.get_activity(e["input"]))
+
+        amount = _getAmountOrFormula(e)
+
+        # Params provided ? Evaluate formulas
+        if isinstance(amount, Basic):
+            new_params = [(name, value) for name, value in _complete_and_expand_params(params, list(all_params().keys())).items()]
+            amount = float(amount.subs(new_params).evalf())
+            de["computed_amount"] = True
+
+        de["amount"] = amount
+        de["formula"] = e.get("formula", None)
+        exs.append(de)
+    a["exchanges"] = exs
+    return a
+
 class QStandardItemRO(QtGui.QStandardItem):
     def __init__(self, *args, data=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -45,6 +76,9 @@ class TableModel(QtGui.QStandardItemModel):
                 QStandardItemRO(str(e.get(k, "-")), data=e)
                 for k in ["name", "unit", "categories", "location", "amount", "formula"]
             ]
+
+            if "computed_amount" in e:
+               row[-2].setForeground(QtGui.QBrush(QtCore.Qt.GlobalColor.red))
 
             etype = e.get("type", "unknown")
             if etype == "emission":
@@ -177,6 +211,23 @@ class ActivityWindow(QtGui.QMainWindow):
         super().show(*args, **kwargs)
         self.tree_view.setColumnWidth(0, 400)
 
+class ActivityWindowWithParams(ActivityWindow):
+    keep = dict()
+
+    def __init__(self, activity_json, params):
+        super().__init__(activity_json)
+        self.params = params
+
+    def closeEvent(self, ev):
+        if self.activity_key in ActivityWindow.keep:
+            del ActivityWindowWithParams.keep[self.activity_key]
+        super().closeEvent(ev)
+
+    def explore(self, index):
+        r = index.row()
+        v = self.model.root.child(r, 0).data()
+        show_activity_with_params(bw2data.get_activity((v["database"], v["code"])), self.params)
+
 # Replace IPython version to one compatible with Qt6
 def start_event_loop_qt4(app=None):
     """Start the qt event loop in a consistent manner."""
@@ -192,7 +243,7 @@ def start_event_loop_qt4(app=None):
     else:
         app._in_event_loop = True
 
-def _show_activity(activity_json):
+def _show_activity(cls, activity_json, *args):
 
     if 'matplotlib' in sys.modules:
         import matplotlib
@@ -202,9 +253,9 @@ def _show_activity(activity_json):
 
     app = get_app_qt4()
 
-    if (window := ActivityWindow.keep.get((activity_json["database"], activity_json["code"]), None)) is None:
-        window = ActivityWindow(activity_json)
-        ActivityWindow.keep[(activity_json["database"], activity_json["code"])] = window
+    if (window := cls.keep.get((activity_json["database"], activity_json["code"]), None)) is None:
+        window = cls(activity_json, *args)
+        cls.keep[(activity_json["database"], activity_json["code"])] = window
     window.show()
 
     if not is_event_loop_running_qt4(app):
@@ -214,7 +265,11 @@ def _show_activity(activity_json):
 
 def show_activity(act):
     activity_json = activity_to_json(act)
-    _show_activity(activity_json)
+    _show_activity(ActivityWindow, activity_json)
+
+def show_activity_with_params(act, params):
+    activity_json = activity_to_json_with_params(act, params)
+    _show_activity(ActivityWindowWithParams, activity_json, params)
 
 def close_all():
     for w in list(ActivityWindow.keep.values()):
