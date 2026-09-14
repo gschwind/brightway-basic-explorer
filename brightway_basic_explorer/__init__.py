@@ -49,7 +49,7 @@ class TableModel(QtGui.QStandardItemModel):
             etype = e.get("type", "unknown")
             if etype == "emission":
                 path = os.path.join(os.path.dirname(__file__), "icons", "emission.png")
-            elif etype == "process":
+            elif etype in {"process", "processwithreferenceproduct"}:
                 path = os.path.join(os.path.dirname(__file__), "icons", "process.png")
             elif etype == "natural resource":
                 path = os.path.join(os.path.dirname(__file__), "icons", "natural_resource.png")
