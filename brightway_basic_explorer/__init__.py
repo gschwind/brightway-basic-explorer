@@ -89,11 +89,9 @@ class ActionMenu(QtGui.QMenu):
 class ActivityWindow(QtGui.QMainWindow):
     keep = dict()
 
-    def __init__(self, act):
+    def __init__(self, activity_json):
         super().__init__()
-        self.act = act
-
-        data = activity_to_json(act)
+        self.activity_key = (activity_json["database"], activity_json["code"])
 
         self.setWindowTitle("Activity Viewer")
         self.setGeometry(100, 100, 800, 600)
@@ -109,7 +107,7 @@ class ActivityWindow(QtGui.QMainWindow):
 
         for i, k in enumerate(["database", "name", "location", "unit", "categories", "type"]):
             grid.addWidget(QtGui.QLabel(f"{k}:"), i, 0)
-            x = QtGui.QLabel(f"{str(data.get(k, '-'))}")
+            x = QtGui.QLabel(f"{str(activity_json.get(k, '-'))}")
             x.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
             grid.addWidget(x, i, 1)
         next_row = grid.rowCount()
@@ -134,7 +132,7 @@ class ActivityWindow(QtGui.QMainWindow):
         self.tree_view.setAlternatingRowColors(True)
 
         self.model = TableModel()
-        self.model.load(data["exchanges"])
+        self.model.load(activity_json["exchanges"])
         self.tree_view.setModel(self.model)
         self.tree_view.doubleClicked.connect(self.doubleCliked)
         self.tree_view.setExpandsOnDoubleClick(False)
@@ -149,8 +147,8 @@ class ActivityWindow(QtGui.QMainWindow):
         self.action_menu.exec(self.tree_view.viewport().mapToGlobal(point))
 
     def closeEvent(self, ev):
-        if self.act.key in ActivityWindow.keep:
-            del ActivityWindow.keep[self.act.key]
+        if self.activity_key in ActivityWindow.keep:
+            del ActivityWindow.keep[self.activity_key]
         super().closeEvent(ev)
 
     def update_filter(self, *args):
@@ -194,7 +192,7 @@ def start_event_loop_qt4(app=None):
     else:
         app._in_event_loop = True
 
-def show_activity(act):
+def _show_activity(activity_json):
 
     if 'matplotlib' in sys.modules:
         import matplotlib
@@ -204,15 +202,19 @@ def show_activity(act):
 
     app = get_app_qt4()
 
-    if (window := ActivityWindow.keep.get(act.key, None)) is None:
-        window = ActivityWindow(act)
-        ActivityWindow.keep[act.key] = window
+    if (window := ActivityWindow.keep.get((activity_json["database"], activity_json["code"]), None)) is None:
+        window = ActivityWindow(activity_json)
+        ActivityWindow.keep[(activity_json["database"], activity_json["code"])] = window
     window.show()
 
     if not is_event_loop_running_qt4(app):
         start_event_loop_qt4(app)
 
     window.activateWindow()
+
+def show_activity(act):
+    activity_json = activity_to_json(act)
+    _show_activity(activity_json)
 
 def close_all():
     for w in list(ActivityWindow.keep.values()):
