@@ -140,7 +140,7 @@ class ActivityWindow(QtGui.QMainWindow):
         self.tree_view.setExpandsOnDoubleClick(False)
         self.tree_view.setSelectionBehavior(QtGui.QAbstractItemView.SelectionBehavior.SelectItems)
         #self.tree_view.rightClick.connect(self.rightClick)
-        self.tree_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tree_view.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree_view.customContextMenuRequested.connect(self.context_menu)
 
     def context_menu(self, point):
