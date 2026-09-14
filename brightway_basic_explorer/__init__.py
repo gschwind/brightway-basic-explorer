@@ -39,7 +39,7 @@ def activity_to_json_with_params(act, params):
 
         # Params provided ? Evaluate formulas
         if isinstance(amount, Basic):
-            new_params = [(name, value) for name, value in _complete_and_expand_params(params, list(all_params().keys())).items()]
+            new_params = list(_complete_and_expand_params(params, list(all_params().keys())).items())
             amount = amount.subs(new_params)
             if amount.is_number:
                 amount = float(amount.evalf())
