@@ -109,6 +109,9 @@ class ActionMenu(QtGui.QMenu):
         self.action_explore = self.addAction("Explore")
         self.action_explore.triggered.connect(self.explore_triggered)
 
+        self.action_explore = self.addAction("Explore in new window")
+        self.action_explore.triggered.connect(self.explore_in_new_window_triggered)
+
     def copy_triggered(self):
         QtGui.QGuiApplication.clipboard().setText(self.index.data())
 
@@ -121,22 +124,75 @@ class ActionMenu(QtGui.QMenu):
     def explore_triggered(self):
         self.parentWidget().explore(self.index)
 
+    def explore_in_new_window_triggered(self):
+        self.parentWidget().explore_in_new_window(self.index)
+
+class TabBar(QtGui.QTabBar):
+    def __init__(self):
+        super().__init__()
+
+    def tabSizeHint(self, index):
+        value = super().tabSizeHint(index)
+        return QtCore.QSize(200, value.height())
+
+    def minimumTabSizeHint(self, index):
+        value = super().minimumTabSizeHint(index)
+        return QtCore.QSize(100, value.height())
+
 
 class ActivityWindow(QtGui.QMainWindow):
-    keep = dict()
+    keep = list()
 
-    def __init__(self, activity_json):
+    def __init__(self, activity_json, params=None):
         super().__init__()
-        self.activity_key = (activity_json["database"], activity_json["code"])
+        self.tabs = dict()
+        self.xcount = 0
+        self.params = params
 
         self.setWindowTitle("Activity Viewer")
-        self.setGeometry(100, 100, 800, 600)
+        self.setMinimumSize(QtCore.QSize(800, 600))
 
-        # Create central widget and layout
-        central_widget = QtGui.QWidget()
-        self.setCentralWidget(central_widget)
+        self.tabs_widget = QtGui.QTabWidget()
+        self.tabs_widget.setTabBar(TabBar())
+        self.tabs_widget.setTabsClosable(True)
+        self.tabs_widget.setMovable(True)
+        self.tabs_widget.tabCloseRequested.connect(self.close_tab)
+        self.tabs_widget.setElideMode(QtCore.Qt.TextElideMode.ElideRight)
+        self.setCentralWidget(self.tabs_widget)
+        self.add_activity(activity_json)
+
+    def add_activity(self, activity_json):
+        key = (activity_json["database"], activity_json["code"])
+        if key in self.tabs:
+            activity_widget = self.tabs[key]
+            self.tabs_widget.setCurrentWidget(activity_widget)
+            return
+
+        activity_widget = ActivityTab(self, activity_json)
+        self.tabs[activity_widget.activity_key] = activity_widget
+        self.tabs_widget.addTab(activity_widget, f"#{self.xcount} "+activity_json["name"])
+        self.tabs_widget.setCurrentWidget(activity_widget)
+        activity_widget.tree_view.setColumnWidth(0, 400)
+        self.xcount += 1
+
+    def close_tab(self, index):
+        w = self.tabs_widget.widget(index)
+        del self.tabs[w.activity_key]
+        self.tabs_widget.removeTab(index)
+
+    def closeEvent(self, ev):
+        ActivityWindow.keep.remove(self)
+        super().closeEvent(ev)
+
+class ActivityTab(QtGui.QWidget):
+    def __init__(self, xparent, activity_json):
+        super().__init__()
+
+        self.xparent = xparent
+        self.activity_key = (activity_json["database"], activity_json["code"])
+
         layout = QtGui.QVBoxLayout()
-        central_widget.setLayout(layout)
+        self.setLayout(layout)
 
         grid = QtGui.QGridLayout()
         layout.addLayout(grid)
@@ -182,11 +238,6 @@ class ActivityWindow(QtGui.QMainWindow):
         self.action_menu = ActionMenu(self, index)
         self.action_menu.exec(self.tree_view.viewport().mapToGlobal(point))
 
-    def closeEvent(self, ev):
-        if self.activity_key in ActivityWindow.keep:
-            del ActivityWindow.keep[self.activity_key]
-        super().closeEvent(ev)
-
     def update_filter(self, *args):
         text = self.filter_edit.text()
         if self.ignore_case.isChecked():
@@ -207,28 +258,19 @@ class ActivityWindow(QtGui.QMainWindow):
     def explore(self, index):
         r = index.row()
         v = self.model.root.child(r, 0).data()
-        show_activity(bw2data.get_activity((v["database"], v["code"])))
+        act = bw2data.get_activity((v["database"], v["code"]))
+        if self.xparent.params is None:
+            activity_json = activity_to_json(act)
+        else:
+            activity_json = activity_to_json_with_params(act, self.xparent.params)
+        self.xparent.add_activity(activity_json)
 
-    def show(self, *args, **kwargs):
-        super().show(*args, **kwargs)
-        self.tree_view.setColumnWidth(0, 400)
-
-class ActivityWindowWithParams(ActivityWindow):
-    keep = dict()
-
-    def __init__(self, activity_json, params):
-        super().__init__(activity_json)
-        self.params = params
-
-    def closeEvent(self, ev):
-        if self.activity_key in ActivityWindow.keep:
-            del ActivityWindowWithParams.keep[self.activity_key]
-        super().closeEvent(ev)
-
-    def explore(self, index):
+    def explore_in_new_window(self, index):
         r = index.row()
         v = self.model.root.child(r, 0).data()
-        show_activity_with_params(bw2data.get_activity((v["database"], v["code"])), self.params)
+        act = bw2data.get_activity((v["database"], v["code"]))
+        show_activity(act, self.xparent.params)
+
 
 # Replace IPython version to one compatible with Qt6
 def start_event_loop_qt4(app=None):
@@ -245,7 +287,7 @@ def start_event_loop_qt4(app=None):
     else:
         app._in_event_loop = True
 
-def _show_activity(cls, activity_json, *args):
+def show_activity(act, params=None):
 
     if 'matplotlib' in sys.modules:
         import matplotlib
@@ -255,9 +297,13 @@ def _show_activity(cls, activity_json, *args):
 
     app = get_app_qt4()
 
-    if (window := cls.keep.get((activity_json["database"], activity_json["code"]), None)) is None:
-        window = cls(activity_json, *args)
-        cls.keep[(activity_json["database"], activity_json["code"])] = window
+    if params is None:
+        activity_json = activity_to_json(act)
+    else:
+        activity_json = activity_to_json_with_params(act, params)
+
+    window = ActivityWindow(activity_json, params)
+    ActivityWindow.keep.append(window)
     window.show()
 
     if not is_event_loop_running_qt4(app):
@@ -265,14 +311,6 @@ def _show_activity(cls, activity_json, *args):
 
     window.activateWindow()
 
-def show_activity(act):
-    activity_json = activity_to_json(act)
-    _show_activity(ActivityWindow, activity_json)
-
-def show_activity_with_params(act, params):
-    activity_json = activity_to_json_with_params(act, params)
-    _show_activity(ActivityWindowWithParams, activity_json, params)
-
 def close_all():
-    for w in list(ActivityWindow.keep.values()):
+    for w in list(ActivityWindow.keep):
         w.close()
