@@ -4,7 +4,7 @@ from IPython.external.qt_for_kernel import QtGui, QtCore
 from IPython.lib.guisupport import start_event_loop_qt4, get_app_qt4, is_event_loop_running_qt4
 
 import os
-import matplotlib
+import sys
 import bw2data
 
 def activity_to_json(act):
@@ -179,11 +179,29 @@ class ActivityWindow(QtGui.QMainWindow):
         super().show(*args, **kwargs)
         self.tree_view.setColumnWidth(0, 400)
 
+# Replace IPython version to one compatible with Qt6
+def start_event_loop_qt4(app=None):
+    """Start the qt event loop in a consistent manner."""
+    if app is None:
+        app = get_app_qt4([""])
+    if not is_event_loop_running_qt4(app):
+        app._in_event_loop = True
+        if hasattr(app, "exec_"):
+            app.exec_()
+        else:
+            app.exec()
+        app._in_event_loop = False
+    else:
+        app._in_event_loop = True
+
 def show_activity(act):
-    if 'module://matplotlib_inline.backend_inline' == matplotlib.backends.backend:
-        print("WARNING: ActivityGUI will block, use `%matplotlib qt` to avoid blocking")
-    if matplotlib.backends.backend != "qtagg":
-        print(f"unexpected backend {matplotlib.backends.backend}")
+
+    if 'matplotlib' in sys.modules:
+        import matplotlib
+        if hasattr(matplotlib.backends, "backend"):
+            if 'qt' not in matplotlib.backends.backend:
+                print("WARNING: ActivityGUI will block, use `%matplotlib qt` to avoid blocking")
+
     app = get_app_qt4()
 
     if (window := ActivityWindow.keep.get(act.key, None)) is None:
