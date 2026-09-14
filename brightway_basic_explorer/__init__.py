@@ -1,7 +1,7 @@
 # coding=utf-8
 
 from IPython.external.qt_for_kernel import QtGui, QtCore
-from IPython.lib.guisupport import start_event_loop_qt4, get_app_qt4, is_event_loop_running_qt4
+from IPython.lib.guisupport import get_app_qt4, is_event_loop_running_qt4
 
 import os
 import sys
@@ -26,7 +26,7 @@ def activity_to_json_with_params(act, params):
             _getAmountOrFormula,
         )
 
-        from sympy import Basic, Symbol
+        from sympy import Basic
     except:
         raise Exception("lca_algebraic not found, please install it before using show_activity_with_params")
 
