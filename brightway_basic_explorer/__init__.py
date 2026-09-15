@@ -287,6 +287,36 @@ class ActivityTab(QtGui.QWidget):
         act = bw2data.get_activity((v["database"], v["code"]))
         show_activity(act, self.xparent.params)
 
+class SearchModel(QtGui.QStandardItemModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setColumnCount(4)
+        self.setHeaderData(0, QtCore.Qt.Orientation.Horizontal, "Name")
+        self.setHeaderData(1, QtCore.Qt.Orientation.Horizontal, "Unit")
+        self.setHeaderData(2, QtCore.Qt.Orientation.Horizontal, "Category")
+        self.setHeaderData(3, QtCore.Qt.Orientation.Horizontal, "Location")
+
+    def load(self, data):
+        self.exchanges = [e for e in data]
+        self.root = self.invisibleRootItem()
+        for e in data:
+            row = [
+                QStandardItemRO(str(e.get(k, "-")), data=e)
+                for k in ["name", "unit", "categories", "location"]
+            ]
+
+            etype = e.get("type", "unknown")
+            if etype == "emission":
+                path = os.path.join(os.path.dirname(__file__), "icons", "emission.png")
+            elif etype in {"process", "processwithreferenceproduct"}:
+                path = os.path.join(os.path.dirname(__file__), "icons", "process.png")
+            elif etype == "natural resource":
+                path = os.path.join(os.path.dirname(__file__), "icons", "natural_resource.png")
+            else:
+                path = os.path.join(os.path.dirname(__file__), "icons", "unknown.png")
+
+            row[0].setIcon(QtGui.QIcon(path))
+            self.root.appendRow(row)
 
 class SearchWindow(QtGui.QMainWindow):
     def __init__(self, db, keywords=""):
@@ -365,7 +395,7 @@ class SearchWindow(QtGui.QMainWindow):
         acts = [dict(a) for a in acts]
 
         old_model = self.model
-        self.model = TableModel()
+        self.model = SearchModel()
         self.model.load(acts)
         self.tree_view.setModel(self.model)
         if old_model is not None:
