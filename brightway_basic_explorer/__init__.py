@@ -73,7 +73,7 @@ class QStandardItemRO(QtGui.QStandardItem):
         self.setSelectable(True)
         self.setData(data)
 
-class TableModel(QtGui.QStandardItemModel):
+class ExchangeModel(QtGui.QStandardItemModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setColumnCount(6)
@@ -239,7 +239,7 @@ class ActivityTab(QtGui.QWidget):
         self.tree_view.setSortingEnabled(True)
         self.tree_view.setAlternatingRowColors(True)
 
-        self.model = TableModel()
+        self.model = ExchangeModel()
         self.model.load(activity_json["exchanges"])
         self.tree_view.setModel(self.model)
         self.tree_view.doubleClicked.connect(self.doubleCliked)
