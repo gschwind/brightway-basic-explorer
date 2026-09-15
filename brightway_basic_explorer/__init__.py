@@ -117,8 +117,11 @@ class ActionMenu(QtGui.QMenu):
         self.action_copy = self.addAction("Copy")
         self.action_copy.triggered.connect(self.copy_triggered)
 
-        self.action_copy = self.addAction("Copy Full Reference")
-        self.action_copy.triggered.connect(self.copy_full_reference_triggered)
+        self.action_copy_ref = self.addAction("Copy Full Reference")
+        self.action_copy_ref.triggered.connect(self.copy_full_reference_triggered)
+
+        self.action_copy_code = self.addAction("Copy Activity Code")
+        self.action_copy_code.triggered.connect(self.copy_code_triggered)
 
         if hasattr(self.parentWidget(), "explore"):
             self.action_explore = self.addAction("Explore")
@@ -135,6 +138,12 @@ class ActionMenu(QtGui.QMenu):
         parent = self.parentWidget()
         v = parent.model.root.child(self.index.row(), 0).data()
         text = (v["database"], v["name"], v.get("location", None), v.get("categories", tuple()), v.get("unit", None))
+        QtGui.QGuiApplication.clipboard().setText(str(text))
+
+    def copy_code_triggered(self):
+        parent = self.parentWidget()
+        v = parent.model.root.child(self.index.row(), 0).data()
+        text = (v["database"], v["code"])
         QtGui.QGuiApplication.clipboard().setText(str(text))
 
     def explore_triggered(self):
