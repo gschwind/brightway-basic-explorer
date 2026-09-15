@@ -12,7 +12,7 @@ name = "brightway-basic-explorer"
 description = "Implement basic GUI to explorer brightway ativities"
 readme = "README.md"
 license-files = ["COPYING"]
-version = "0.9.dev5"
+version = "0.9.dev6"
 dependencies = [ "ipython" ]
 requires-python = ">= 3.10"
 keywords = ["lca", "ecoinvent", "brightway"]
