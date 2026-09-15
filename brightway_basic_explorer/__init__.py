@@ -400,6 +400,7 @@ class SearchWindow(QtGui.QMainWindow):
         self.tree_view.setModel(self.model)
         if old_model is not None:
             old_model.deleteLater()
+        self.tree_view.setColumnWidth(0, 400)
 
     def context_menu(self, point):
         index = self.tree_view.indexAt(point)
