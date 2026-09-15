@@ -52,19 +52,19 @@ def activity_to_json_with_params(act, params):
     a["exchanges"] = exs
     return a
 
-class MessageDialog(QtGui.QDialog):
-    def __init__(self, msg):
-        super().__init__()
-        self.msg = msg
+def warn_dialog(msg):
+    print(f"WARNING: {msg}")
+    w = QtGui.QMessageBox(QtGui.QMessageBox.Icon.Warning, "WARNING", msg)
+    w.show()
+    w.setMaximumSize(800, 600)
+    w.exec()
 
-        layout = QtGui.QVBoxLayout()
-        self.setLayout(layout)
-        layout.addWidget(QtGui.QLabel(msg))
-
-        self.button = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.StandardButton.Ok)
-        layout.addWidget(self.button)
-        self.button.accepted.connect(self.close)
-
+def fatal_dialog(msg):
+    print(f"ERROR: {msg}")
+    w = QtGui.QMessageBox(QtGui.QMessageBox.Icon.Critical, "ERROR", msg)
+    w.show()
+    w.setMaximumSize(800, 600)
+    w.exec()
 
 class QStandardItemRO(QtGui.QStandardItem):
     def __init__(self, *args, data=None, **kwargs):
@@ -386,9 +386,7 @@ class SearchWindow(QtGui.QMainWindow):
         text = self.keywords.text()
         keywords = [re.sub("[^a-zA-Z0-9_-]", "", s) for s in text.split(" ") if len(s) > 0]
         if all(len(x) < 3 for x in keywords):
-            w = MessageDialog("Too smalls keywords")
-            w.setWindowTitle("WARNING")
-            w.exec()
+            warn_dialog("Too smalls keywords")
             return
 
         acts = self.db.search(" ".join(keywords), proxy=True, limit=200)
@@ -489,9 +487,7 @@ def search(database, keywords=""):
 
     if isinstance(database, str):
         if database not in bw2data.databases:
-            w = MessageDialog(f"Database {database} not found !")
-            w.setWindowTitle("WARNING")
-            w.exec()
+            fatal_dialog(f"Database {database} not found !")
             return
         database = bw2data.Database(database)
 
