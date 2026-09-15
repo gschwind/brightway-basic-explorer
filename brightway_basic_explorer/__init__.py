@@ -3,6 +3,7 @@
 from IPython.external.qt_for_kernel import QtGui, QtCore
 from IPython.lib.guisupport import get_app_qt4, is_event_loop_running_qt4
 
+import re
 import os
 import sys
 import bw2data
@@ -51,13 +52,26 @@ def activity_to_json_with_params(act, params):
     a["exchanges"] = exs
     return a
 
+class MessageDialog(QtGui.QDialog):
+    def __init__(self, msg):
+        super().__init__()
+        self.msg = msg
+
+        layout = QtGui.QVBoxLayout()
+        self.setLayout(layout)
+        layout.addWidget(QtGui.QLabel(msg))
+
+        self.button = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.StandardButton.Ok)
+        layout.addWidget(self.button)
+        self.button.accepted.connect(self.close)
+
+
 class QStandardItemRO(QtGui.QStandardItem):
     def __init__(self, *args, data=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.setEditable(False)
         self.setSelectable(True)
         self.setData(data)
-
 
 class TableModel(QtGui.QStandardItemModel):
     def __init__(self, parent=None):
@@ -106,11 +120,13 @@ class ActionMenu(QtGui.QMenu):
         self.action_copy = self.addAction("Copy Full Reference")
         self.action_copy.triggered.connect(self.copy_full_reference_triggered)
 
-        self.action_explore = self.addAction("Explore")
-        self.action_explore.triggered.connect(self.explore_triggered)
+        if hasattr(self.parentWidget(), "explore"):
+            self.action_explore = self.addAction("Explore")
+            self.action_explore.triggered.connect(self.explore_triggered)
 
-        self.action_explore = self.addAction("Explore in new window")
-        self.action_explore.triggered.connect(self.explore_in_new_window_triggered)
+        if hasattr(self.parentWidget(), "explore_in_new_window"):
+            self.action_explore = self.addAction("Explore in new window")
+            self.action_explore.triggered.connect(self.explore_in_new_window_triggered)
 
     def copy_triggered(self):
         QtGui.QGuiApplication.clipboard().setText(self.index.data())
@@ -272,6 +288,125 @@ class ActivityTab(QtGui.QWidget):
         show_activity(act, self.xparent.params)
 
 
+class SearchWindow(QtGui.QMainWindow):
+    def __init__(self, db, keywords=""):
+        super().__init__()
+
+        self.db = db
+
+        self.setWindowTitle("Search Activity")
+        self.setMinimumSize(QtCore.QSize(800, 600))
+
+        central_widget = QtGui.QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QtGui.QVBoxLayout()
+        central_widget.setLayout(layout)
+
+        grid = QtGui.QGridLayout()
+        layout.addLayout(grid)
+
+        next_row = grid.rowCount()
+        grid.addWidget(QtGui.QLabel("database:"), next_row, 0)
+        grid.addWidget(QtGui.QLabel(self.db.name), next_row, 1)
+
+        # Keyword query
+        next_row = grid.rowCount()
+        grid.addWidget(QtGui.QLabel("keywords:"), next_row, 0)
+        self.keywords = QtGui.QLineEdit("")
+        self.keywords.setText(keywords)
+        self.keywords.returnPressed.connect(self.update_search)
+        grid.addWidget(self.keywords, next_row, 1)
+        self.keywords_button = QtGui.QPushButton("Update")
+        self.keywords_button.clicked.connect(self.update_search)
+
+        grid.addWidget(self.keywords_button, next_row, 2)
+
+        next_row = grid.rowCount()
+        grid.addWidget(QtGui.QLabel("filter:"), next_row, 0)
+        self.filter_edit = QtGui.QLineEdit("")
+        self.filter_edit.textChanged.connect(self.update_filter)
+        grid.addWidget(self.filter_edit, next_row, 1)
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 1)
+        self.ignore_case = QtGui.QCheckBox("Ignore Case")
+        self.ignore_case.setChecked(True)
+        if hasattr(self.ignore_case, "checkStateChanged"):
+            self.ignore_case.checkStateChanged.connect(self.update_filter)
+        else:
+            self.ignore_case.stateChanged.connect(self.update_filter)
+        next_row = grid.rowCount()
+        grid.addWidget(self.ignore_case, next_row, 1)
+
+        # Create tree view
+        self.tree_view = QtGui.QTreeView()
+        layout.addWidget(self.tree_view)
+        self.tree_view.setSortingEnabled(True)
+        self.tree_view.setAlternatingRowColors(True)
+        self.tree_view.doubleClicked.connect(self.doubleCliked)
+        self.tree_view.setExpandsOnDoubleClick(False)
+        self.tree_view.setSelectionBehavior(QtGui.QAbstractItemView.SelectionBehavior.SelectItems)
+        self.tree_view.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(self.context_menu)
+
+        self.model = None
+
+        self.update_search()
+
+    def update_search(self):
+        text = self.keywords.text()
+        keywords = [re.sub("[^a-zA-Z0-9_-]", "", s) for s in text.split(" ") if len(s) > 0]
+        if all(len(x) < 3 for x in keywords):
+            w = MessageDialog("Too smalls keywords")
+            w.setWindowTitle("WARNING")
+            w.exec()
+            return
+
+        acts = self.db.search(" ".join(keywords), proxy=True, limit=200)
+        acts = [dict(a) for a in acts]
+
+        old_model = self.model
+        self.model = TableModel()
+        self.model.load(acts)
+        self.tree_view.setModel(self.model)
+        if old_model is not None:
+            old_model.deleteLater()
+
+    def context_menu(self, point):
+        index = self.tree_view.indexAt(point)
+        self.action_menu = ActionMenu(self, index)
+        self.action_menu.exec(self.tree_view.viewport().mapToGlobal(point))
+
+    def update_filter(self, *args):
+        if self.model is None:
+            return
+
+        text = self.filter_edit.text()
+        if self.ignore_case.isChecked():
+            text = text.lower()
+            index = self.model.root.index()
+            for i in range(self.model.rowCount()):
+                v = self.model.root.child(i, 0).data()
+                self.tree_view.setRowHidden(i, index, text not in v["name"].lower())
+        else:
+            index = self.model.root.index()
+            for i in range(self.model.rowCount()):
+                v = self.model.root.child(i, 0).data()
+                self.tree_view.setRowHidden(i, index, text not in v["name"])
+
+    def doubleCliked(self, index):
+        self.explore_in_new_window(index)
+
+    def explore_in_new_window(self, index):
+        r = index.row()
+        v = self.model.root.child(r, 0).data()
+        act = bw2data.get_activity((v["database"], v["code"]))
+        show_activity(act)
+
+    def show(self, *args, **kwargs):
+        self.tree_view.setColumnWidth(0, 400)
+        super().show(*args, **kwargs)
+
+
 # Replace IPython version to one compatible with Qt6
 def start_event_loop_qt4(app=None):
     """Start the qt event loop in a consistent manner."""
@@ -310,6 +445,28 @@ def show_activity(act, params=None):
         start_event_loop_qt4(app)
 
     window.activateWindow()
+
+def search(database, keywords=""):
+
+    if 'matplotlib' in sys.modules:
+        import matplotlib
+        if hasattr(matplotlib.backends, "backend"):
+            if 'qt' not in matplotlib.backends.backend:
+                print("WARNING: ActivityGUI will block, use `%matplotlib qt` to avoid blocking")
+
+    app = get_app_qt4()
+
+    if isinstance(database, str):
+        database = bw2data.Database(database)
+
+    window = SearchWindow(database, keywords)
+    window.show()
+
+    if not is_event_loop_running_qt4(app):
+        start_event_loop_qt4(app)
+
+    window.activateWindow()
+    return window
 
 def close_all():
     for w in list(ActivityWindow.keep):
