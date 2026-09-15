@@ -470,6 +470,9 @@ def show_activity(act, params=None):
 
     app = get_app_qt4()
 
+    if isinstance(act, tuple):
+        act = bw2data.get_activity(act)
+
     if params is None:
         activity_json = activity_to_json(act)
     else:
