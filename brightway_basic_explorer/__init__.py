@@ -488,6 +488,11 @@ def search(database, keywords=""):
     app = get_app_qt4()
 
     if isinstance(database, str):
+        if database not in bw2data.databases:
+            w = MessageDialog(f"Database {database} not found !")
+            w.setWindowTitle("WARNING")
+            w.exec()
+            return
         database = bw2data.Database(database)
 
     window = SearchWindow(database, keywords)
