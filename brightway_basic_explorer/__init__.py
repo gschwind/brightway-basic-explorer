@@ -222,7 +222,7 @@ class ActivityTab(QtGui.QWidget):
         grid = QtGui.QGridLayout()
         layout.addLayout(grid)
 
-        for i, k in enumerate(["database", "name", "location", "unit", "categories", "type"]):
+        for i, k in enumerate(["database", "name", "location", "unit", "categories", "type", "reference product"]):
             grid.addWidget(QtGui.QLabel(f"{k}:"), i, 0)
             x = QtGui.QLabel(f"{str(activity_json.get(k, '-'))}")
             x.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
